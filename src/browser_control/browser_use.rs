@@ -22,7 +22,11 @@ pub async fn new_browser(
     let elem_button = elem_form.find(By::Css("button[type='submit']")).await?;
     elem_button.click().await?;
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    let header = driver.find(By::Id("mw-content-text")).await?.text().await?;
+    // Print the heading text.
+    println!("Heading text: {}", header);
 
     println!("Test passed: Successfully navigated to Wikipedia and searched for 'selenium'.");
     // Print the page source.
