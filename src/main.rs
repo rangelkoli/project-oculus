@@ -3,7 +3,7 @@ mod agent;
 use project_oculus::utils::generate_ai_response;
 mod prompts;
 use crate::prompts::PLANNER_PROMPT;
-use project_oculus::browser_control::actions::go_to_url;
+use project_oculus::browser_control::actions::{extract_content, go_to_url};
 use project_oculus::browser_control::browser_use::create_new_browser;
 use serde_json::{self, Value}; // Import Value
 use std::io::{self, Read};
@@ -51,10 +51,17 @@ fn main() {
                             .expect("URL should be a string"),
                     ))
                     .expect("Failed to navigate to URL");
-            } else if json_value["action"][0]["open_new_tab"].is_object() {
+            } else if json_value["action"][0]["extract_content"].is_object() {
                 println!("Opening a new tab.");
-                // Here you would implement the logic to open a new tab
-                // For example, using driver.new_tab() if supported
+
+                tokio::runtime::Runtime::new()
+                    .expect("msg")
+                    .block_on(async {
+                        let content = extract_content(&driver)
+                            .await
+                            .expect("Failed to extract content");
+                        println!("Extracted Content: {}", content);
+                    });
             } else {
                 println!("No action to open a new tab.");
             }
@@ -72,8 +79,18 @@ fn main() {
             Ok(_) => {
                 if input.trim().to_lowercase() == "q" {
                     break;
+                } else {
+                    tokio::runtime::Runtime::new()
+                        .expect("msg")
+                        .block_on(async {
+                            let content = extract_content(&driver)
+                                .await
+                                .expect("Failed to extract content");
+                            println!("Extracted Content: {}", content);
+                        });
                 }
             }
+
             Err(e) => {
                 eprintln!("Error reading input: {}", e);
                 break;
