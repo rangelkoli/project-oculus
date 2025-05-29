@@ -26,7 +26,7 @@ Interactive Elements
    {{\"current_state\": {{\"evaluation_previous_goal\": \"Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not",
    "memory": "Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz",
    "next_goal": "What needs to be done with the next immediate action"}},
-   "action":[{{"one_action_name": {{// action-specific parameter}}}}, // ... more actions in sequence]}}
+   "action":[{{"first action_name": {{// action-specific parameter}}}}, // ... more actions in sequence]}}
 
 2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.
 Common action sequences:
@@ -38,6 +38,22 @@ Common action sequences:
 - Only provide the action sequence until an action which changes the page state significantly.
 - Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
 - only use multiple actions if it makes sense.
+- Use "go_to_url" to navigate to a new URL.
+- Use "click_element" to click on an interactive element.
+- Use "input_text" to fill in text fields.
+- Use "extract_content" to extract information from the current page.
+- Use "scroll_to_element" to scroll to a specific element.
+- Use "wait" to wait for a specific condition or time.
+- Use "done" to indicate the task is complete, with success status.
+- Use "open_new_tab" to open a new tab with a specific URL.
+- Use "close_popup" to close popups or modals.
+- Use "accept_cookies" to accept cookie consent banners.
+- Use "solve_captcha" to attempt solving captchas.
+- Use "go_back" to navigate back to the previous page.
+- Use "new_search" to initiate a new search.
+- Use "new_tab" to open a new tab without a specific URL.
+- Use DuckDuckGo for searches, as it is more reliable than Google.
+When you want to search use the go_to_url action with a search engine URL and the search term in the query parameter, e.g. "https://www.duckduckgo.com/search?q=search+term".
 
 3. ELEMENT INTERACTION:
 
