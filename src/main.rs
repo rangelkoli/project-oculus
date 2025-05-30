@@ -5,8 +5,10 @@ mod prompts;
 use crate::prompts::PLANNER_PROMPT;
 use project_oculus::browser_control::actions::{extract_content, go_to_url};
 use project_oculus::browser_control::browser_use::create_new_browser;
+use project_oculus::browser_control::interactive_elements::get_interactive_elements_in_hashmap;
+
 use serde_json::{self, Value}; // Import Value
-use std::io::{self, Read};
+use std::io::{self};
 fn main() {
     let user_task = get_user_input("Enter the task you want to perform: ");
     println!("You entered: {}", user_task);
@@ -71,8 +73,16 @@ fn main() {
         }
     };
 
+    // loop {
+    //     tokio::runtime::Runtime::new()
+    //         .expect("Failed to create Tokio runtime")
+    //         .block_on(async { generate_ai_response("prompt", "system_instructions") });
+
+    // }
+
     // Wait for user to press 'q' to quit
     println!("Press 'q' and Enter to quit the browser...");
+    let mut clickable_elements = Vec::new();
     loop {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
@@ -80,15 +90,45 @@ fn main() {
                 if input.trim().to_lowercase() == "q" {
                     break;
                 } else {
+                    // tokio::runtime::Runtime::new()
+                    //     .expect("msg")
+                    //     .block_on(async {
+                    //         let content = extract_content(&driver)
+                    //             .await
+                    //             .expect("Failed to extract content");
+                    //         println!("Extracted Content: {}", content);
+                    //     });
+
                     tokio::runtime::Runtime::new()
-                        .expect("msg")
+                        .expect("Failed to create Tokio runtime")
                         .block_on(async {
-                            let content = extract_content(&driver)
-                                .await
-                                .expect("Failed to extract content");
-                            println!("Extracted Content: {}", content);
+                            let interactive_elements =
+                                get_interactive_elements_in_hashmap(&driver).await;
+                            match interactive_elements {
+                                Ok(elements) => {
+                                    clickable_elements = elements.into_iter().collect::<Vec<_>>();
+                                }
+                                Err(e) => {
+                                    eprintln!("Error retrieving interactive elements: {}", e);
+                                }
+                            }
                         });
                 }
+                println!("{}", clickable_elements.len());
+                let first_element = clickable_elements.first().unwrap().clone();
+                let element_locator = first_element.1;
+
+                tokio::runtime::Runtime::new()
+                    .expect("Failed to create Tokio runtime")
+                    .block_on(async {
+                        driver
+                            .find(element_locator)
+                            .await
+                            .unwrap()
+                            .click()
+                            .await
+                            .unwrap();
+                    });
             }
 
             Err(e) => {

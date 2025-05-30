@@ -1,5 +1,4 @@
-use gemini_rust::{Gemini, Tool};
-use thirtyfour::common::print;
+use gemini_rust::Gemini;
 use tokio;
 
 #[tokio::main]
