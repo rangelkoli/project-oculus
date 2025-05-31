@@ -61,11 +61,6 @@ pub async fn get_all_clickable_element_locators(
 
     let elements: Vec<WebElement> = driver.find_all(By::Css(selector)).await?;
 
-    println!(
-        "Found {} potentially clickable elements using CSS selector.",
-        elements.len()
-    );
-
     for (index, element) in elements.iter().enumerate() {
         if !element.is_displayed().await.unwrap_or(false) {
             continue;
@@ -134,10 +129,6 @@ pub async fn get_all_clickable_element_locators(
                 // Lightweight check for ID uniqueness
                 if driver.find_all(By::Id(&id_val)).await?.len() == 1 {
                     best_locator = Some(By::Id(id_val.clone()));
-                    println!(
-                        "  Key: '{}' -> Locator: By::Id('{}') (verified unique)",
-                        map_key, id_val
-                    );
                 } else {
                     eprintln!(
                         "  Key: '{}' -> Warning: ID '{}' exists but is not unique. Trying other locators.",
@@ -157,10 +148,6 @@ pub async fn get_all_clickable_element_locators(
                     // Lightweight check for uniqueness
                     if driver.find_all(By::Css(&css_by_name)).await?.len() == 1 {
                         best_locator = Some(By::Css(css_by_name.clone()));
-                        println!(
-                            "  Key: '{}' -> Locator: By::Css('{}') (unique name attr)",
-                            map_key, css_by_name
-                        );
                     } else {
                         eprintln!(
                             "  Key: '{}' -> Warning: CSS by name attribute '{}' is not unique. Trying XPath.",
@@ -177,10 +164,6 @@ pub async fn get_all_clickable_element_locators(
                 // Basic check: does the generated XPath find at least one element?
                 if !driver.find_all(By::XPath(&xpath_str)).await?.is_empty() {
                     best_locator = Some(By::XPath(xpath_str.clone()));
-                    println!(
-                        "  Key: '{}' -> Locator: By::XPath('{}') (JS-generated)",
-                        map_key, xpath_str
-                    );
                 } else {
                     eprintln!(
                         "  Key: '{}' -> Warning: JS-generated XPath '{}' found no elements. Skipping this XPath.",
