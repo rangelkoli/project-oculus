@@ -6,7 +6,7 @@ pub async fn new_browser(
     _search_term: &str, // This parameter is not used in the current implementation
 ) -> WebDriverResult<()> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:62768", caps).await?;
+    let driver = WebDriver::new("http://localhost:60044", caps).await?;
 
     driver.goto(format!("https://{}", _website_url)).await?;
 
@@ -40,6 +40,6 @@ pub async fn new_browser(
 
 pub async fn create_new_browser() -> WebDriverResult<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:64778", caps).await?;
+    let driver = WebDriver::new("http://localhost:60044", caps).await?;
     Ok(driver)
 }

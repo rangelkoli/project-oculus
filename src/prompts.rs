@@ -116,6 +116,13 @@ Interactive elements in the format: [index]<type>text</type>
 3. Determine if the previous goal was accomplished
 4. Decide on the next best action to progress toward the overall objective
 
+**IMPORTANT:**
+- You must ALWAYS return a valid action from the list below in the `action` field.
+- The `action` field must be an object with exactly one key, which is the action name, and its value is an object with the required parameters (even if empty).
+- Do NOT invent or hallucinate action names. Only use the actions listed below.
+- If you are unsure, choose the most relevant action from the list.
+- If you cannot proceed, use the `done` action with `success: false` and a reason in `result`.
+
 **Available Actions (choose one for your next action):**
 - **go_to_url**: Navigate to a specific URL and open in new tab
     - Parameter: url (string)

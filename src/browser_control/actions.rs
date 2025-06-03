@@ -66,66 +66,10 @@ pub async fn extract_information(
     }
 }
 
-// Open a new tab with a specific URL
-pub async fn open_new_tab(driver: &WebDriver, url: &str) -> WebDriverResult<()> {
-    print!("Opening new tab: {}", url);
-    driver.new_tab().await?;
-    driver.goto(url).await?;
-    Ok(())
-}
-
-// Close the current tab
-pub async fn close_current_tab(driver: &WebDriver) -> WebDriverResult<()> {
-    print!("Closing current tab.");
-    driver.close_window().await?;
-    Ok(())
-}
-
-// Accept cookies by clicking a selector (commonly used for cookie banners)
-pub async fn accept_cookies(driver: &WebDriver, selector: &str) -> WebDriverResult<()> {
-    print!("Accepting cookies with selector: {}", selector);
-    let element = driver.find(By::Css(selector)).await?;
-    element.click().await?;
-    Ok(())
-}
-
-// Go back to the previous page
-pub async fn go_back(driver: &WebDriver) -> WebDriverResult<()> {
-    print!("Going back to previous page.");
-    driver.back().await?;
-    Ok(())
-}
-
-// Refresh the current page
-pub async fn refresh_page(driver: &WebDriver) -> WebDriverResult<()> {
-    print!("Refreshing the current page.");
-    driver.refresh().await?;
-    Ok(())
-}
-
-// Solve captcha placeholder (actual implementation would require integration with a captcha solving service)
-pub async fn solve_captcha(_driver: &WebDriver) -> WebDriverResult<()> {
-    print!("Solving captcha (not implemented).");
-    Ok(())
-}
-
-// Close popup/modal by clicking a selector
-pub async fn close_popup(driver: &WebDriver, selector: &str) -> WebDriverResult<()> {
-    print!("Closing popup with selector: {}", selector);
-    let element = driver.find(By::Css(selector)).await?;
-    element.click().await?;
-    Ok(())
-}
-
-// Scroll to a specific element by CSS selector
-pub async fn scroll_to_element(driver: &WebDriver, selector: &str) -> WebDriverResult<()> {
-    print!("Scrolling to element with selector: {}", selector);
-    let element = driver.find(By::Css(selector)).await?;
-    driver
-        .execute(
-            "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
-            vec![element.to_json()?],
-        )
-        .await?;
+pub async fn search_query(driver: &WebDriver, _search_term: String) -> WebDriverResult<()> {
+    print!("Searching for: {}", _search_term);
+    let encoded_term = urlencoding::encode(&_search_term);
+    let search_url = format!("https://duckduckgo.com/?q={}", encoded_term);
+    driver.goto(&search_url).await?;
     Ok(())
 }
