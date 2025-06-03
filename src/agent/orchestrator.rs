@@ -233,3 +233,19 @@ pub async fn orchestrator_agent(_planner_response: String) -> Result<(), Box<dyn
 
     Ok(())
 }
+
+fn gen_prompt(_high_level_plan: String, _current_url: &str, _task_history: String) -> String {
+    format!(
+        "Here is the high-level plan:
+{_high_level_plan}
+
+Here is the current URL:
+{_current_url}
+
+Here is the task history:
+{_task_history}
+
+Based on the high-level plan, the current URL, and the task history, determine the next action to take. If the plan is not perfect, you might have to change the plan based on the given page. Output your decision in the JSON format specified above."
+
+    )
+}
