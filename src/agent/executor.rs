@@ -1,11 +1,11 @@
 use project_oculus::browser_control::actions::{
-    click_element, extract_content, extract_information, fill_form, go_to_url,
+    click_element, extract_content, extract_information, fill_form, go_to_url, search_query,
 };
 use serde_json::Value;
 use std::io::{self, Write};
 use thirtyfour::prelude::*;
-// ...existing code...
-pub async fn execute_task(_string_response: &str, driver: &WebDriver) -> WebDriverResult<String> {
+
+pub async fn execute_task(_string_response: String, driver: &WebDriver) -> WebDriverResult<String> {
     // Simulate task execution
     let json_res: Result<Value, serde_json::Error> = serde_json::from_str(&_string_response);
     match json_res {
@@ -21,34 +21,36 @@ pub async fn execute_task(_string_response: &str, driver: &WebDriver) -> WebDriv
             println!("Parsed JSON: {:?}", json_value);
 
             // Check for stop condition first
-            if json_value["action"][0]["stop"].as_bool() == Some(true) {
+            if json_value["next_action"][0]["stop"].as_bool() == Some(true) {
                 println!("Stop condition reached.");
-                if let Some(answer) = json_value["action"][0]["final_answer"].as_str() {
+                if let Some(answer) = json_value["next_action"][0]["final_answer"].as_str() {
                     return Ok(format!("FINAL_ANSWER: {}", answer));
                 }
                 return Ok("TASK_COMPLETE".to_string());
             }
 
-            // Check for final answer action
-            if let Some(answer) = json_value["action"][0]["final_answer"]["answer"].as_str() {
+            // Check for final answer next_action
+            if let Some(answer) = json_value["next_action"][0]["final_answer"]["answer"].as_str() {
                 println!("Providing final answer: {}", answer);
                 return Ok(format!("FINAL_ANSWER: {}", answer));
             }
 
-            // ...existing code for other actions...
-            if let Some(url) = json_value["action"][0]["go_to_url"]["url"].as_str() {
+            // ...existing code for other next_actions...
+            if let Some(url) = json_value["next_action"][0]["go_to_url"]["url"].as_str() {
                 println!("Navigating to URL: {}", url);
                 go_to_url(&driver, url).await?;
-            } else if json_value["action"][0]["extract_content"].is_object() {
+            } else if json_value["next_action"][0]["extract_content"].is_object() {
                 println!("Extracting content...");
                 let content = extract_content(&driver).await?;
                 println!("Extracted Content: {}", content);
             } else if let Some(selector) =
-                json_value["action"][0]["click_element"]["selector"].as_str()
+                json_value["next_action"][0]["click_element"]["selector"].as_str()
             {
                 println!("Clicking element with selector: {}", selector);
                 click_element(&driver, selector).await?;
-            } else if let Some(info) = json_value["action"][0]["extract_information"].as_object() {
+            } else if let Some(info) =
+                json_value["next_action"][0]["extract_information"].as_object()
+            {
                 println!("Extracting information from the current page.");
                 let extracted_info =
                     extract_information(&driver, _string_response.to_string()).await?;
@@ -68,7 +70,8 @@ pub async fn execute_task(_string_response: &str, driver: &WebDriver) -> WebDriv
                         println!("Final goal not reached, continuing execution.");
                     }
                 }
-            } else if let Some(form_data) = json_value["action"][0]["fill_form"]["data"].as_array()
+            } else if let Some(form_data) =
+                json_value["next_action"][0]["fill_form"]["data"].as_array()
             {
                 println!("Filling form with provided data.");
                 let mut form_data_vec = Vec::new();
@@ -80,6 +83,11 @@ pub async fn execute_task(_string_response: &str, driver: &WebDriver) -> WebDriv
                     }
                 }
                 fill_form(&driver, &form_data_vec).await?;
+            } else if let Some(query) =
+                json_value["next_action"][0]["search_query"]["query"].as_str()
+            {
+                println!("Searching for query: {}", query);
+                search_query(&driver, query.to_string()).await?;
             } else {
                 println!("No valid action found in JSON.");
             }

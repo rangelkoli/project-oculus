@@ -118,16 +118,16 @@ Your task is to analyze the high-level plan, the current web page, and the task 
 "".""],
 "next_action" : {
 Choose one of the actions provided below
-go_to_url(driver: &WebDriver, url: &str)
+go_to_url
 Navigates to the specified URL in a new browser tab.
-extract_content(driver: &WebDriver)
+extract_content
 Extracts and returns the text content from the current page's <body>.
-click_element(driver: &WebDriver, selector: &str)
+click_element
 Clicks the element found by the given CSS selector.
-fill_form(driver: &WebDriver, form_data: &[(String, String)])
+fill_form
 Fills form fields specified by CSS selectors with provided values.
-extract_information(driver: &WebDriver, _current_state: String)
-search_query(driver: &WebDriver, query: String
+extract_information
+search_query
 Search for the text in DuckDuckGo Search Engine
 },
 }
