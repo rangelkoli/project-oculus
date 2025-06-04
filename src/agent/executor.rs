@@ -3,11 +3,12 @@ use project_oculus::browser_control::actions::{
 };
 use serde_json::Value;
 use std::io::{self, Write};
-use thirtyfour::prelude::*;
+use thirtyfour::{common::print, prelude::*};
 
 pub async fn execute_task(_string_response: String, driver: &WebDriver) -> WebDriverResult<String> {
     // Simulate task execution
     let json_res: Result<Value, serde_json::Error> = serde_json::from_str(&_string_response);
+    println!("Executing task with response: {}", _string_response);
     match json_res {
         Ok(ref json_value) if json_value["done"].as_bool() == Some(true) => {
             println!("Task already done, skipping execution.");
@@ -27,6 +28,10 @@ pub async fn execute_task(_string_response: String, driver: &WebDriver) -> WebDr
                     return Ok(format!("FINAL_ANSWER: {}", answer));
                 }
                 return Ok("TASK_COMPLETE".to_string());
+            } else if let Some(query) = json_value["next_action"]["search_query"]["query"].as_str()
+            {
+                println!("Searching for query: {}", query);
+                search_query(&driver, query.to_string()).await?;
             }
 
             // Check for final answer next_action
@@ -36,20 +41,19 @@ pub async fn execute_task(_string_response: String, driver: &WebDriver) -> WebDr
             }
 
             // ...existing code for other next_actions...
-            if let Some(url) = json_value["next_action"][0]["go_to_url"]["url"].as_str() {
+            if let Some(url) = json_value["next_action"]["go_to_url"]["url"].as_str() {
                 println!("Navigating to URL: {}", url);
                 go_to_url(&driver, url).await?;
-            } else if json_value["next_action"][0]["extract_content"].is_object() {
+            } else if json_value["next_action"]["extract_content"].is_object() {
                 println!("Extracting content...");
                 let content = extract_content(&driver).await?;
                 println!("Extracted Content: {}", content);
             } else if let Some(selector) =
-                json_value["next_action"][0]["click_element"]["selector"].as_str()
+                json_value["next_action"]["click_element"]["selector"].as_str()
             {
                 println!("Clicking element with selector: {}", selector);
                 click_element(&driver, selector).await?;
-            } else if let Some(info) =
-                json_value["next_action"][0]["extract_information"].as_object()
+            } else if let Some(info) = json_value["next_action"]["extract_information"].as_object()
             {
                 println!("Extracting information from the current page.");
                 let extracted_info =
@@ -71,7 +75,7 @@ pub async fn execute_task(_string_response: String, driver: &WebDriver) -> WebDr
                     }
                 }
             } else if let Some(form_data) =
-                json_value["next_action"][0]["fill_form"]["data"].as_array()
+                json_value["next_action"]["fill_form"]["data"].as_array()
             {
                 println!("Filling form with provided data.");
                 let mut form_data_vec = Vec::new();
@@ -83,11 +87,6 @@ pub async fn execute_task(_string_response: String, driver: &WebDriver) -> WebDr
                     }
                 }
                 fill_form(&driver, &form_data_vec).await?;
-            } else if let Some(query) =
-                json_value["next_action"][0]["search_query"]["query"].as_str()
-            {
-                println!("Searching for query: {}", query);
-                search_query(&driver, query.to_string()).await?;
             } else {
                 println!("No valid action found in JSON.");
             }
