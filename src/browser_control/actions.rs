@@ -73,3 +73,9 @@ pub async fn search_query(driver: &WebDriver, _search_term: String) -> WebDriver
     driver.goto(&search_url).await?;
     Ok(())
 }
+
+pub async fn go_back(driver: &WebDriver) -> WebDriverResult<()> {
+    print!("Going back to the previous page.");
+    driver.back().await?;
+    Ok(())
+}

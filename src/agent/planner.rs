@@ -1,4 +1,3 @@
-use crate::prompts::PLANNER_PROMPT;
 use project_oculus::utils::generate_ai_response;
 
 pub async fn planner_agent() -> Result<String, Box<dyn std::error::Error>> {

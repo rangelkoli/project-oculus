@@ -77,12 +77,3 @@ pub async fn generate_ai_response(
 
     Ok(generated_text.to_string())
 }
-
-// Synchronous wrapper for backward compatibility
-pub fn generate_ai_response_sync(prompt: &str, system_instructions: &str) -> String {
-    let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-    match runtime.block_on(generate_ai_response(prompt, system_instructions)) {
-        Ok(response) => response,
-        Err(e) => format!("Error generating AI response: {}", e),
-    }
-}

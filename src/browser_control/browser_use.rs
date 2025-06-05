@@ -40,6 +40,6 @@ pub async fn new_browser(
 
 pub async fn create_new_browser() -> WebDriverResult<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:60044", caps).await?;
+    let driver = WebDriver::new("http://localhost:60227", caps).await?;
     Ok(driver)
 }
