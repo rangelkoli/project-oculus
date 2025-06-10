@@ -7,9 +7,19 @@ pub async fn planner_agent() -> Result<String, Box<dyn std::error::Error>> {
     // The input to the planner_agent is now just the user_task.
     // The PLANNER_PROMPT guides the LLM to structure its response, including the user_task in its output JSON.
 
+    // Generate the prompt for the planner AI.
+    let instructions = generate_ai_response(
+        &user_task,
+        "Create a browseruse prompt, i want you to write a prompt and instructions on what to do for browseruse",
+    ).await;
+
     let prompt_input = gen_prompt(&user_task);
 
-    let response = generate_ai_response(&prompt_input, "").await;
+    let response = generate_ai_response(
+        &prompt_input,
+        &instructions.unwrap_or_else(|_| "No instructions provided".to_string()),
+    )
+    .await;
     let mut string_response: String = String::new();
 
     match response {

@@ -79,3 +79,16 @@ pub async fn go_back(driver: &WebDriver) -> WebDriverResult<()> {
     driver.back().await?;
     Ok(())
 }
+
+pub async fn fill_form_with_data(
+    driver: &WebDriver,
+    form_data: &[(String, String)],
+) -> WebDriverResult<()> {
+    print!("Filling form with provided data.");
+    for (selector, value) in form_data {
+        let element = driver.find(By::Css(selector)).await?;
+        element.send_keys(value).await?;
+    }
+
+    Ok(())
+}
