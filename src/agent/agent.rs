@@ -3,11 +3,10 @@ use crate::agent::task::task_agent;
 use crate::agent::task::{add_task_to_history, get_task_history};
 use project_oculus::browser_control::interactive_elements::get_interactive_elements_in_hashmap;
 use serde_json::Value;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
 use thirtyfour::WebDriver;
-use thirtyfour::prelude::*;
 // Define the orchestrator trait that agents can call
 
 #[derive(Debug, Clone)]
@@ -28,6 +27,7 @@ pub struct AIAgent {
     context: String,
     driver: WebDriver,
     task_history: Vec<TaskRecord>,
+    extracted_urls: HashSet<String>,
 }
 
 impl AIAgent {
@@ -51,6 +51,7 @@ impl AIAgent {
             context,
             driver,
             task_history: Vec::new(),
+            extracted_urls: HashSet::new(),
         }
     }
 
@@ -60,6 +61,14 @@ impl AIAgent {
 
     pub fn clear_task_history(&mut self) {
         self.task_history.clear();
+    }
+
+    pub fn has_extracted_content_from_url(&self, url: &str) -> bool {
+        self.extracted_urls.contains(url)
+    }
+
+    pub fn mark_url_as_extracted(&mut self, url: String) {
+        self.extracted_urls.insert(url);
     }
 
     fn add_task_record(&mut self, step: usize, action: String, result: String) {
@@ -171,6 +180,7 @@ impl AIAgent {
                     String::from("Unknown (error getting URL)")
                 }
             };
+            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
             // 3. Create prompt for task agent
             let task_agent_input = self.gen_prompt(
@@ -244,6 +254,18 @@ impl AIAgent {
                                 if plan_steps.len() == 1 || plan_steps.is_empty() {
                                     break;
                                 }
+                            } else if result
+                                .trim_matches('"')
+                                .eq_ignore_ascii_case("CONTENT_ALREADY_EXTRACTED")
+                            {
+                                println!(
+                                    "Content already extracted from current URL. Agent should try a different action."
+                                );
+                                self.try_add_to_external_history(format!(
+                                    "Step {}: Content already extracted from current URL",
+                                    current_step
+                                ))
+                                .await;
                             } else if result.to_uppercase().contains("ERROR") {
                                 println!(
                                     "Executor reported an error: {}. Continuing cautiously.",
@@ -329,7 +351,37 @@ impl AIAgent {
     ) -> Result<String, Box<dyn std::error::Error>> {
         println!("Executing action: {}", action);
 
+        // Get current URL before executing
+        let current_url = match self.driver.current_url().await {
+            Ok(url) => url.to_string(),
+            Err(e) => {
+                eprintln!("Failed to get current URL: {}", e);
+                String::from("Unknown")
+            }
+        };
+
+        // Check if the action is extract_content and URL already extracted
+        if let Ok(action_json) = serde_json::from_str::<serde_json::Value>(&action) {
+            if action_json.get("extract_content").is_some() {
+                if self.has_extracted_content_from_url(&current_url) {
+                    println!(
+                        "Content already extracted from URL: {}. Skipping extraction.",
+                        current_url
+                    );
+                    return Ok("CONTENT_ALREADY_EXTRACTED".to_string());
+                }
+            }
+        }
+
         let result = execute_task(string_response, &self.driver, action.clone()).await?;
+
+        // If extract_content was successful, mark URL as extracted
+        if let Ok(action_json) = serde_json::from_str::<serde_json::Value>(&action) {
+            if action_json.get("extract_content").is_some() && result == "CONTINUE" {
+                self.mark_url_as_extracted(current_url.clone());
+                println!("Marked URL as extracted: {}", current_url);
+            }
+        }
 
         println!("Action executed successfully.");
         Ok(result)
@@ -342,6 +394,25 @@ impl AIAgent {
         task_history: String,
         interactive_elements: String,
     ) -> String {
+        let extracted_urls_info = if self.extracted_urls.is_empty() {
+            String::from("No URLs have had their content extracted yet.")
+        } else {
+            format!(
+                "URLs that have already had their content extracted:\n{}",
+                self.extracted_urls
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            )
+        };
+
+        let current_url_extracted_status = if self.has_extracted_content_from_url(&current_url) {
+            "\n\nIMPORTANT: Content has already been extracted from the current URL. Consider taking a different action instead of extracting content again."
+        } else {
+            ""
+        };
+
         format!(
             "Agent Role: {}
 Agent Backstory: {}
@@ -361,6 +432,8 @@ Here is the task history:
 Here are the interactive elements on the page:
 {}
 
+{}{}
+
 Based on your role, goal, and the current task, determine the next action to take. Use the available tools and context to make the best decision. Output your decision in the JSON format specified.",
             self.role,
             self.backstory,
@@ -370,7 +443,9 @@ Based on your role, goal, and the current task, determine the next action to tak
             high_level_plan,
             current_url,
             task_history,
-            interactive_elements
+            interactive_elements,
+            extracted_urls_info,
+            current_url_extracted_status
         )
     }
 

@@ -32,9 +32,10 @@ Your job is to analyze the high-level plan, the current web page, and the task h
     "click_element": { "selector": "..." },
     "fill_form": { "form_data": [["selector1", "value1"], ...] },
     "fill_form_with_user_input_credentials": { "form_data": ["selector1", ...] },
-    "extract_information": {},
-    "search_query": { "query": "..." }
-    "go_back": {}
+    "search_query": { "query": "..." },
+    "go_back": {}, // Go back to the previous page if already extracted content and nothing else if found on the page
+
+
 
   }
 
