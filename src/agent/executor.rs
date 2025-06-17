@@ -1,6 +1,7 @@
 use project_oculus::browser_control::actions::{
-    click_element, extract_content, extract_information, fill_form,
-    fill_form_with_user_input_credentials, go_back, go_to_url, search_query,
+    click_element, create_document, extract_content, extract_information, fill_form,
+    fill_form_with_user_input_credentials, generate_and_save_document, go_back, go_to_url,
+    search_query,
 };
 use serde_json::Value;
 use thirtyfour::prelude::*;
@@ -111,6 +112,38 @@ pub async fn execute_task(
                                 }
                             }
                             fill_form_with_user_input_credentials(&driver, &form_data_vec).await?;
+                        }
+                        Ok("CONTINUE".to_string())
+                    } else if action_obj.get("create_document").is_some() {
+                        if let (Some(filename), Some(content), Some(format_type)) = (
+                            action_obj["create_document"]["filename"].as_str(),
+                            action_obj["create_document"]["content"].as_str(),
+                            action_obj["create_document"]["format"].as_str(),
+                        ) {
+                            println!(
+                                "Creating document: {} with format: {}",
+                                filename, format_type
+                            );
+                            let result =
+                                create_document(&driver, filename, content, format_type).await?;
+                            println!("{}", result);
+                        }
+                        Ok("CONTINUE".to_string())
+                    } else if action_obj.get("generate_document").is_some() {
+                        if let (Some(task_desc), Some(filename), Some(format_type)) = (
+                            action_obj["generate_document"]["task_description"].as_str(),
+                            action_obj["generate_document"]["filename"].as_str(),
+                            action_obj["generate_document"]["format"].as_str(),
+                        ) {
+                            println!("Generating document for task: {}", task_desc);
+                            let result = generate_and_save_document(
+                                &driver,
+                                task_desc,
+                                filename,
+                                format_type,
+                            )
+                            .await?;
+                            println!("{}", result);
                         }
                         Ok("CONTINUE".to_string())
                     } else if action_obj.get("stop").is_some() {

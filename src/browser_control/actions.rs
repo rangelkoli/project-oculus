@@ -1,5 +1,7 @@
 use crate::utils::generate_ai_response;
+use std::fs;
 use std::io::{self, Write};
+use std::path::Path;
 use thirtyfour::prelude::*;
 pub async fn go_to_url(driver: &WebDriver, url: &str) -> WebDriverResult<()> {
     print!("Navigating to URL: {}", url);
@@ -11,7 +13,23 @@ pub async fn go_to_url(driver: &WebDriver, url: &str) -> WebDriverResult<()> {
 pub async fn extract_content(driver: &WebDriver) -> WebDriverResult<String> {
     print!("Extracting content from the current page.");
     let content = driver.find(By::Tag("body")).await?.text().await?;
-    Ok(content)
+
+    // Generate AI summary of the page content
+    let prompt = format!(
+        "Summarize the following webpage content and identify the most important text on the page: {}",
+        content.trim()
+    );
+
+    match generate_ai_response(&prompt, "").await {
+        Ok(summary) => {
+            println!("Page Summary: {}", summary);
+            Ok(format!("{}\n\nSummary: {}", content, summary))
+        }
+        Err(e) => {
+            eprintln!("Error generating summary: {}", e);
+            Ok(content)
+        }
+    }
 }
 
 pub async fn click_element(driver: &WebDriver, selector: &str) -> WebDriverResult<()> {
@@ -111,4 +129,116 @@ pub async fn fill_form_with_user_input_credentials(
         element.send_keys(value).await?;
     }
     Ok(())
+}
+
+pub async fn create_document(
+    _driver: &WebDriver,
+    filename: &str,
+    content: &str,
+    format_type: &str,
+) -> WebDriverResult<String> {
+    println!(
+        "Creating document: {} with format: {}",
+        filename, format_type
+    );
+
+    // Ensure the documents directory exists
+    let documents_dir = "documents";
+    if !Path::new(documents_dir).exists() {
+        if let Err(e) = fs::create_dir_all(documents_dir) {
+            eprintln!("Failed to create documents directory: {}", e);
+            return Ok(format!(
+                "Error: Failed to create documents directory: {}",
+                e
+            ));
+        }
+    }
+
+    let file_path = match format_type.to_lowercase().as_str() {
+        "markdown" | "md" => format!("{}/{}.md", documents_dir, filename),
+        "text" | "txt" => format!("{}/{}.txt", documents_dir, filename),
+        "json" => format!("{}/{}.json", documents_dir, filename),
+        "html" => format!("{}/{}.html", documents_dir, filename),
+        _ => format!("{}/{}.txt", documents_dir, filename), // Default to txt
+    };
+
+    // Write content to file
+    if let Err(e) = fs::write(&file_path, content) {
+        eprintln!("Failed to write file {}: {}", file_path, e);
+        return Ok(format!("Error: Failed to write file {}: {}", file_path, e));
+    }
+
+    println!("Document saved successfully: {}", file_path);
+    Ok(format!("Document saved: {}", file_path))
+}
+
+pub async fn generate_and_save_document(
+    _driver: &WebDriver,
+    task_description: &str,
+    filename: &str,
+    format_type: &str,
+) -> WebDriverResult<String> {
+    println!("Generating document for task: {}", task_description);
+
+    let prompt = match format_type.to_lowercase().as_str() {
+        "markdown" | "md" => format!(
+            "Create a well-structured markdown document for the following task: {}. 
+            Include appropriate headings, formatting, and organization. 
+            Make it professional and comprehensive.",
+            task_description
+        ),
+        "text" | "txt" => format!(
+            "Create a well-structured text document for the following task: {}. 
+            Make it clear, organized, and professional.",
+            task_description
+        ),
+        "json" => format!(
+            "Create a JSON document containing structured data for the following task: {}. 
+            Ensure valid JSON format with appropriate structure.",
+            task_description
+        ),
+        "html" => format!(
+            "Create a complete HTML document for the following task: {}. 
+            Include proper HTML structure, styling, and semantic markup.",
+            task_description
+        ),
+        _ => format!(
+            "Create a document for the following task: {}",
+            task_description
+        ),
+    };
+
+    match generate_ai_response(&prompt, "").await {
+        Ok(generated_content) => {
+            // Clean up the content if it contains markdown code blocks
+            let cleaned_content =
+                if format_type.to_lowercase() == "markdown" || format_type.to_lowercase() == "md" {
+                    generated_content
+                        .replace("```markdown", "")
+                        .replace("```", "")
+                        .trim()
+                        .to_string()
+                } else if format_type.to_lowercase() == "html" {
+                    generated_content
+                        .replace("```html", "")
+                        .replace("```", "")
+                        .trim()
+                        .to_string()
+                } else if format_type.to_lowercase() == "json" {
+                    generated_content
+                        .replace("```json", "")
+                        .replace("```", "")
+                        .trim()
+                        .to_string()
+                } else {
+                    generated_content
+                };
+
+            create_document(_driver, filename, &cleaned_content, format_type).await
+        }
+        Err(e) => {
+            eprintln!("Error generating document content: {}", e);
+            Ok(format!("Error: Failed to generate document: {}", e))
+        }
+    }
 }

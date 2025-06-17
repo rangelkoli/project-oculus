@@ -456,15 +456,36 @@ Based on your role, goal, and the current task, determine the next action to tak
         screenshot_path: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // For each locator, find the element and highlight it
-        for locator in interactive_elements.values() {
+        for (index, locator) in interactive_elements.values().enumerate() {
             if let Ok(elements) = self.driver.find_all(locator.clone()).await {
                 for element in elements {
-                    let script = r#"
+                    let script = format!(
+                        r#"
                         arguments[0].style.outline = '3px solid red';
                         arguments[0].style.boxShadow = '0 0 10px 2px red';
-                    "#;
+                        arguments[0].setAttribute('data-element-index', '{}');
+                        
+                        // Add a number label overlay
+                        var label = document.createElement('div');
+                        label.textContent = '{}';
+                        label.style.position = 'absolute';
+                        label.style.top = '0';
+                        label.style.left = '0';
+                        label.style.backgroundColor = 'red';
+                        label.style.color = 'white';
+                        label.style.fontSize = '12px';
+                        label.style.fontWeight = 'bold';
+                        label.style.padding = '2px 6px';
+                        label.style.zIndex = '10000';
+                        label.style.borderRadius = '3px';
+                        
+                        arguments[0].style.position = 'relative';
+                        arguments[0].appendChild(label);
+                    "#,
+                        index, index
+                    );
                     // Use the updated method name: execute()
-                    let _ = self.driver.execute(script, vec![element.to_json()?]).await;
+                    let _ = self.driver.execute(&script, vec![element.to_json()?]).await;
                 }
             }
         }
