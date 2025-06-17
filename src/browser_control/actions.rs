@@ -1,4 +1,5 @@
 use crate::utils::generate_ai_response;
+use std::io::{self, Write};
 use thirtyfour::prelude::*;
 pub async fn go_to_url(driver: &WebDriver, url: &str) -> WebDriverResult<()> {
     print!("Navigating to URL: {}", url);
@@ -90,5 +91,24 @@ pub async fn fill_form_with_data(
         element.send_keys(value).await?;
     }
 
+    Ok(())
+}
+
+pub async fn fill_form_with_user_input_credentials(
+    driver: &WebDriver,
+    input_cred_selector: &[(String)],
+) -> WebDriverResult<()> {
+    print!("Filling form with user-provided data.");
+
+    for selector in input_cred_selector {
+        print!("Enter value for {}: ", selector);
+        io::stdout().flush().unwrap(); // Ensure the prompt is displayed immediately
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        let value = input.trim();
+
+        let element = driver.find(By::Css(selector)).await?;
+        element.send_keys(value).await?;
+    }
     Ok(())
 }

@@ -9,6 +9,7 @@ You start from DuckDuckGo search engine page so the first action must be to go t
 - `extract_information(driver: &WebDriver, _current_state: String)`: Extract and return information from the current page.
 - `search_query(driver: &WebDriver, query: String)`: Search for the text using DuckDuckGo.
 - `go_back(driver: &WebDriver)`: Go back to the previous page in the browser history.
+- `fill_form_with_user_data(driver: &WebDriver, form_data: &[(String, String)])`: Fill form fields by prompting the user for each value.
 
 Your job is to analyze the high-level plan, the current web page, and the task history, then decide the next best action. Always respond in the following JSON format:
 
@@ -30,9 +31,11 @@ Your job is to analyze the high-level plan, the current web page, and the task h
     "extract_content": {},
     "click_element": { "selector": "..." },
     "fill_form": { "form_data": [["selector1", "value1"], ...] },
+    "fill_form_with_user_input_credentials": { "form_data": ["selector1", ...] },
     "extract_information": {},
     "search_query": { "query": "..." }
     "go_back": {}
+
   }
 
 }

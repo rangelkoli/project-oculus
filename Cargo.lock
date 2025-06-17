@@ -872,6 +872,7 @@ dependencies = [
 name = "project-oculus"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "gemini-rust",
  "reqwest",
  "serde",

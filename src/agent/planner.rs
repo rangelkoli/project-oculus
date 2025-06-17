@@ -1,41 +1,45 @@
 use project_oculus::utils::generate_ai_response;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AgentStep {
+    pub id: String,                    // e.g., "web", "data", etc.
+    pub parameters: serde_json::Value, // All parameters needed to create the agent
+    pub run_in_parallel: bool,
+    pub needs_context_from: Option<usize>, // Index of previous agent step to get context from
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PlannerAgentPlan {
+    pub steps: Vec<AgentStep>,
+}
 
 pub async fn planner_agent() -> Result<String, Box<dyn std::error::Error>> {
     let user_task = project_oculus::utils::get_user_input("Enter the task you want to perform: ");
     println!("User task for planner: {}", user_task);
 
-    // The input to the planner_agent is now just the user_task.
-    // The PLANNER_PROMPT guides the LLM to structure its response, including the user_task in its output JSON.
-
+    let mut string_response: String = String::new();
     // Generate the prompt for the planner AI.
     let instructions = generate_ai_response(
-        &user_task,
-        "Create a browseruse prompt, i want you to write a prompt and instructions on what to do for browseruse",
+        &gen_prompt(&user_task),
+        "You are a planning agent that creates detailed execution plans for accomplishing user tasks.",
     ).await;
+    println!(
+        "Instructions for planner AI: {}",
+        instructions
+            .as_deref()
+            .unwrap_or("No instructions provided")
+    );
 
-    let prompt_input = gen_prompt(&user_task);
-
-    let response = generate_ai_response(
-        &prompt_input,
-        &instructions.unwrap_or_else(|_| "No instructions provided".to_string()),
-    )
-    .await;
-    let mut string_response: String = String::new();
-
-    match response {
-        Ok(ai_response) => {
-            println!("Planner AI Raw Response: {}", ai_response);
-            string_response = ai_response;
+    match instructions {
+        Ok(response) => {
+            string_response = response;
         }
         Err(e) => {
-            // Log the error and return it, so the orchestrator can handle it.
             eprintln!("Error generating planner AI response: {}", e);
-            return Err(e.into());
         }
     }
 
-    // Basic cleanup of the response. More robust JSON parsing will be needed.
-    // The LLM should ideally return clean JSON, but this is a fallback.
     string_response = string_response
         .trim_start_matches("```json")
         .trim_start_matches("```")
@@ -45,52 +49,66 @@ pub async fn planner_agent() -> Result<String, Box<dyn std::error::Error>> {
 
     println!("Cleaned Planner AI Response: {}", string_response);
 
-    // At this stage, the planner_agent returns the JSON string.
-    // The orchestrator will be responsible for parsing this JSON and extracting the plan details.
+    // Try to parse the plan for validation (optional, can be used by orchestrator)
+    let _plan: Result<PlannerAgentPlan, _> = serde_json::from_str(&string_response);
+    if let Err(e) = &_plan {
+        eprintln!(
+            "Warning: Could not parse planner response as PlannerAgentPlan: {}",
+            e
+        );
+    }
+
     Ok(string_response)
 }
 
 fn gen_prompt(user_task: &str) -> String {
     format!(
         r#"
-        Generate a high-level, step-by-step plan for the orchestrator AI to accomplish the user's request using its browser access and other available tools.
+Generate a high-level, step-by-step plan for the orchestrator AI to accomplish the user's request using its browser access and other available tools.
 
 Context:
 
-User Request: {} (This will be filled with the specific task from the user)
+User Request: {user_task}
 Orchestrator Capabilities:
 Access and interact with web browsers (navigate, click, type, scrape data, etc.).
 Access to general knowledge.
 Ability to execute code (specify languages if applicable, e.g., Python for data manipulation).
 (Add any other specific tools or capabilities your orchestrator agent possesses).
 Goal: Create a plan that is logical, efficient, and breaks down the user's request into manageable steps for the orchestrator. Each step should be an actionable instruction.
+
 Instructions for the Planner Agent:
-
-Understand the User's Core Goal: Analyze the {{USER_REQUEST}} to identify the fundamental objective. What does the user ultimately want to achieve?
-Identify Key Information Needed: Determine what information is required to fulfill the request. Consider if this information needs to be sourced from the web.
-Outline Major Steps: Break down the task into a sequence of high-level actions. For each step, consider:
-What is the immediate goal of this step?
-What actions will the orchestrator need to perform (e.g., "Navigate to a specific URL," "Search for information on a topic," "Extract specific data points from a webpage," "Summarize findings")?
-If web interaction is needed, what kind of sites or search queries would be most effective? (You don't need to provide exact URLs unless they are explicitly given or obvious).
-Maintain Simplicity and Clarity: Each step in the plan should be clear, concise, and unambiguous. Avoid overly complex or compound steps.
-Consider Dependencies: Ensure the steps are in a logical order. If one step depends on the outcome of another, reflect this in the sequence.
-Error Handling/Contingencies (Optional but Recommended): Briefly consider potential issues (e.g., website not available, information not found) and suggest very high-level alternative approaches if applicable. For example, "If initial search yields no results, try alternative search terms."
-Define the Final Output/Deliverable: What should be the end result of executing the plan? (e.g., "A summary of X," "A list of Y," "Confirmation that Z action has been completed").
-Output Format for the Plan:
-
-Please provide the plan as a numbered list of actionable steps.
-
-Example (for a hypothetical user request: "Find the current weather in London and the top 3 news headlines from BBC News"):
-
-Determine current weather in London:
-Search a reliable weather website (e.g., Google Weather, AccuWeather) for "weather in London."
-Extract the current temperature, conditions (e.g., sunny, rainy), and wind speed.
-Find top 3 news headlines from BBC News:
-Navigate to the BBC News website.
-Identify and extract the top 3 visible news headlines from the homepage.
-Compile and present the information:
-Combine the gathered weather information and news headlines into a concise summary.
-Now, based on the User Request: {}, generate the plan."#,
-        user_task, user_task
+- For each step, output a JSON object with the following structure:
+  - id: String (unique identifier for the agent step, e.g., "ResponseAgent1")
+  - parameters: Object containing:
+    - goal: String (the specific goal for this agent step)
+    - description: String (a brief description of what this agent does)
+    - tools: String (tools or APIs this agent will use)
+    - role: String (the role or type of agent, e.g., "WebSearchAgent")
+    - backstory: String (background or context for the agent, can be brief)
+    - context: String (any context or input needed from previous steps, or empty if none)
+  - run_in_parallel: Boolean (true if this agent can run in parallel with others)
+  - needs_context_from: Integer or null (index of previous step to get context from, or null)
+- Output the plan as a JSON object: {{"steps": [{{...}}, ...]}}
+- Do NOT output markdown or code block markers, only raw JSON.
+- Example output:
+{{
+  "steps": [
+    {{
+      "id": "ResponseAgent1",
+      "parameters": {{
+        "goal": "Find the top 3 footballers 2024",
+        "description": "Searches the web for the top 3 footballers in 2024.",
+        "tools": "web_search",
+        "role": "WebSearchAgent",
+        "backstory": "An agent skilled at searching the web for sports rankings.",
+        "context": ""
+      }},
+      "run_in_parallel": false,
+      "needs_context_from": null
+    }},
+    ...
+  ]
+}}
+Now, based on the User Request: {user_task}, generate the plan."#
     )
 }
