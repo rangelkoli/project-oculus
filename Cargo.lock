@@ -1192,6 +1192,7 @@ dependencies = [
 name = "project-oculus"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "futures",
  "gemini-rust",
  "playwright",

@@ -28,6 +28,7 @@ pub struct AIAgent {
     driver: WebDriver,
     task_history: Vec<TaskRecord>,
     extracted_urls: HashSet<String>,
+    last_screenshot: Option<String>,
 }
 
 impl AIAgent {
@@ -52,6 +53,7 @@ impl AIAgent {
             driver,
             task_history: Vec::new(),
             extracted_urls: HashSet::new(),
+            last_screenshot: None,
         }
     }
 
@@ -305,14 +307,15 @@ impl AIAgent {
             // Highlight all interactive elements and take a screenshot
             let screenshot_path = format!("images/interactive_elements_step_{}.png", current_step);
             if !interactive_elements.is_empty() {
-                if let Err(e) = self
+                match self
                     .highlight_and_screenshot_interactive_elements(
                         &interactive_elements,
                         &screenshot_path,
                     )
                     .await
                 {
-                    eprintln!("Failed to highlight elements or take screenshot: {}", e);
+                    Ok(b64) => self.last_screenshot = Some(b64),
+                    Err(e) => eprintln!("Failed to highlight elements or take screenshot: {}", e),
                 }
             }
 
@@ -391,6 +394,12 @@ impl AIAgent {
         task_history: String,
         interactive_elements: String,
     ) -> String {
+        // include screenshot data if available
+        let screenshot_info = if let Some(ref b64) = self.last_screenshot {
+            format!("\nScreenshot (base64):\n{}", b64)
+        } else {
+            String::new()
+        };
         let extracted_urls_info = if self.extracted_urls.is_empty() {
             String::from("No URLs have had their content extracted yet.")
         } else {
@@ -410,27 +419,14 @@ impl AIAgent {
             ""
         };
 
+        // Construct prompt with aligned placeholders and arguments
         format!(
-            "Agent Role: {}
-Agent Backstory: {}
-Agent Goal: {}
-Agent Tools: {}
-Context: {}
-
-Here is the current task to accomplish:
-{}
-
-Here is the current URL:
-{}
-
-Here is the task history:
-{}
-
-Here are the interactive elements on the page:
-{}
-
-{}{}
-
+            "Agent Role: {}\nAgent Backstory: {}\nAgent Goal: {}\nAgent Tools: {}\nContext: {}\n\n\
+Here is the current task to accomplish:\n{}\n\n\
+Here is the current URL:\n{}\n\n\
+Here is the task history:\n{}\n\n\
+Here are the interactive elements on the page:\n{}\n\n\
+{}\n{}\n{}\n\n\
 Based on your role, goal, and the current task, determine the next action to take. Use the available tools and context to make the best decision. Output your decision in the JSON format specified.",
             self.role,
             self.backstory,
@@ -442,7 +438,8 @@ Based on your role, goal, and the current task, determine the next action to tak
             task_history,
             interactive_elements,
             extracted_urls_info,
-            current_url_extracted_status
+            current_url_extracted_status,
+            screenshot_info
         )
     }
 
@@ -451,7 +448,7 @@ Based on your role, goal, and the current task, determine the next action to tak
         &self,
         interactive_elements: &std::collections::HashMap<String, thirtyfour::By>,
         screenshot_path: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<String, Box<dyn std::error::Error>> {
         // Collect all elements first to avoid multiple await calls
         let mut elements_to_highlight = Vec::new();
 
@@ -520,9 +517,10 @@ Based on your role, goal, and the current task, determine the next action to tak
         }
 
         // Take screenshot
-        // let png_data = self.driver.screenshot_as_png().await?;
-        // fs::write(screenshot_path, &png_data)?;
-        // println!("Screenshot with highlights saved to {}", screenshot_path);
-        Ok(())
+        let png_data = self.driver.screenshot_as_png().await?;
+        fs::write(screenshot_path, &png_data)?;
+        // convert to base64 for AI prompt
+        let b64 = base64::encode(&png_data);
+        Ok(b64)
     }
 }
