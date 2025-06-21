@@ -244,10 +244,7 @@ impl AIAgent {
                                 println!("Final answer received: {}", final_answer);
                                 completed_tasks.push(current_goal.clone());
                                 break;
-                            } else if result
-                                .trim_matches('"')
-                                .eq_ignore_ascii_case("TASK_COMPLETE")
-                            {
+                            } else if result.trim_matches('"').eq_ignore_ascii_case("AGENT_DONE") {
                                 println!("Task marked as complete by executor.");
                                 final_answer = self.get_last_history_or("Task completed.").await;
                                 completed_tasks.push(current_goal.clone());
@@ -455,50 +452,77 @@ Based on your role, goal, and the current task, determine the next action to tak
         interactive_elements: &std::collections::HashMap<String, thirtyfour::By>,
         screenshot_path: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // For each locator, find the element and highlight it
+        // Collect all elements first to avoid multiple await calls
+        let mut elements_to_highlight = Vec::new();
+
         for (index, locator) in interactive_elements.values().enumerate() {
             if let Ok(elements) = self.driver.find_all(locator.clone()).await {
                 for element in elements {
-                    let script = format!(
-                        r#"
-                        arguments[0].style.outline = '3px solid red';
-                        arguments[0].style.boxShadow = '0 0 10px 2px red';
-                        arguments[0].setAttribute('data-element-index', '{}');
-                        
-                        // Add a number label overlay
-                        var label = document.createElement('div');
-                        label.textContent = '{}';
-                        label.style.position = 'absolute';
-                        label.style.top = '0';
-                        label.style.left = '0';
-                        label.style.backgroundColor = 'red';
-                        label.style.color = 'white';
-                        label.style.fontSize = '12px';
-                        label.style.fontWeight = 'bold';
-                        label.style.padding = '2px 6px';
-                        label.style.zIndex = '10000';
-                        label.style.borderRadius = '3px';
-                        
-                        arguments[0].style.position = 'relative';
-                        arguments[0].appendChild(label);
-                    "#,
-                        index, index
-                    );
-                    // Use the updated method name: execute()
-                    let _ = self.driver.execute(&script, vec![element.to_json()?]).await;
+                    elements_to_highlight.push((element, index));
+                    // Only take the first 200 elements
+                    if elements_to_highlight.len() >= 200 {
+                        break;
+                    }
                 }
             }
+            // Break outer loop if we have 200 elements
+            if elements_to_highlight.len() >= 200 {
+                break;
+            }
         }
+
+        // Create a single script to highlight all elements at once
+        if !elements_to_highlight.is_empty() {
+            let script = r#"
+                for (let i = 0; i < arguments.length; i += 2) {
+                    const element = arguments[i];
+                    const index = arguments[i + 1];
+                    
+                    element.style.outline = '3px solid red';
+                    element.style.boxShadow = '0 0 10px 2px red';
+                    element.setAttribute('data-element-index', index.toString());
+                    
+                    // Add a number label overlay
+                    const label = document.createElement('div');
+                    label.textContent = index.toString();
+                    label.style.position = 'absolute';
+                    label.style.top = '0';
+                    label.style.left = '0';
+                    label.style.backgroundColor = 'red';
+                    label.style.color = 'white';
+                    label.style.fontSize = '12px';
+                    label.style.fontWeight = 'bold';
+                    label.style.padding = '2px 6px';
+                    label.style.zIndex = '10000';
+                    label.style.borderRadius = '3px';
+                    
+                    element.style.position = 'relative';
+                    element.appendChild(label);
+                }
+            "#;
+
+            // Prepare arguments array
+            let mut args = Vec::new();
+            for (element, index) in elements_to_highlight {
+                args.push(element.to_json()?);
+                args.push(serde_json::json!(index));
+            }
+
+            // Execute single script with all elements
+            let _ = self.driver.execute(script, args).await;
+        }
+
         // Ensure the images directory exists
         if let Some(parent) = Path::new(screenshot_path).parent() {
             if !parent.exists() {
                 fs::create_dir_all(parent)?;
             }
         }
+
         // Take screenshot
-        let png_data = self.driver.screenshot_as_png().await?;
-        fs::write(screenshot_path, &png_data)?;
-        println!("Screenshot with highlights saved to {}", screenshot_path);
+        // let png_data = self.driver.screenshot_as_png().await?;
+        // fs::write(screenshot_path, &png_data)?;
+        // println!("Screenshot with highlights saved to {}", screenshot_path);
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use project_oculus::browser_control::actions::{
-    click_element, create_document, extract_content, extract_information, fill_form,
+    click_element, create_document, extract_content, fill_form,
     fill_form_with_user_input_credentials, generate_and_save_document, go_back, go_to_url,
     search_query,
 };
@@ -55,23 +55,6 @@ pub async fn execute_task(
                             click_element(&driver, selector).await?;
                         }
                         Ok("CONTINUE".to_string())
-                    } else if action_obj.get("extract_information").is_some() {
-                        println!("Extracting information from the current page.");
-                        let extracted_info =
-                            extract_information(&driver, _string_response.to_string()).await?;
-                        let extracted_json: Value =
-                            serde_json::from_str(&extracted_info).unwrap_or(Value::Null);
-                        println!("Extracted Information: {:?}", extracted_json);
-                        match extracted_json["final_goal_reached"].as_bool() {
-                            Some(true) => match extracted_json["final_answer"].as_str() {
-                                Some(answer) => Ok(format!("FINAL_ANSWER: {}", answer)),
-                                None => Ok("TASK_COMPLETE".to_string()),
-                            },
-                            _ => {
-                                println!("Final goal not reached, continuing execution.");
-                                Ok("CONTINUE".to_string())
-                            }
-                        }
                     } else if action_obj.get("fill_form").is_some() {
                         if let Some(form_data) = action_obj["fill_form"]["data"].as_array() {
                             println!("Filling form with provided data.");
@@ -146,6 +129,9 @@ pub async fn execute_task(
                             println!("{}", result);
                         }
                         Ok("CONTINUE".to_string())
+                    } else if action_obj.get("done").is_some() {
+                        println!("Done action received. Agent finished, moving to next agent.");
+                        Ok("AGENT_DONE".to_string())
                     } else if action_obj.get("stop").is_some() {
                         println!("Stop condition reached.");
                         match action_obj["stop"]["final_answer"].as_str() {

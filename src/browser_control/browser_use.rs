@@ -1,3 +1,4 @@
+use playwright::Playwright;
 use thirtyfour::prelude::*;
 
 #[tokio::main]
@@ -38,8 +39,13 @@ pub async fn new_browser(
     Ok(())
 }
 
-pub async fn create_new_browser() -> WebDriverResult<WebDriver> {
-    let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:4444", caps).await?;
-    Ok(driver)
+pub async fn create_new_browser() -> Result<playwright::api::Browser, playwright::Error> {
+    let playwright = Playwright::initialize().await?;
+    let chromium = playwright.chromium();
+    let browser = chromium
+        .connect_over_cdp_builder("http://localhost:4444")
+        .connect_over_cdp()
+        .await?;
+
+    Ok(browser)
 }
