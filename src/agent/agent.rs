@@ -443,7 +443,7 @@ Based on your role, goal, and the current task, determine the next action to tak
         )
     }
 
-    /// Highlights all interactive elements with a red border and takes a screenshot.
+    /// Highlights all interactive elements with a colored border and overlays a styled label, then takes a screenshot.
     async fn highlight_and_screenshot_interactive_elements(
         &self,
         interactive_elements: &std::collections::HashMap<String, thirtyfour::By>,
@@ -468,39 +468,90 @@ Based on your role, goal, and the current task, determine the next action to tak
             }
         }
 
+        // Remove previous highlights if any
+        let cleanup_script = r#"
+            const containerId = 'playwright-highlight-container';
+            const container = document.getElementById(containerId);
+            if (container) container.remove();
+            // Remove all overlays and labels
+            document.querySelectorAll('.playwright-highlight-label').forEach(e => e.remove());
+        "#;
+        let _ = self.driver.execute(cleanup_script, vec![]).await;
+
         // Create a single script to highlight all elements at once
         if !elements_to_highlight.is_empty() {
             let script = r#"
+                const colors = [
+                    '#FF0000', '#00FF00', '#0000FF', '#FFA500', '#800080', '#008080',
+                    '#FF69B4', '#4B0082', '#FF4500', '#2E8B57', '#DC143C', '#4682B4'
+                ];
+                const containerId = 'playwright-highlight-container';
+                let container = document.getElementById(containerId);
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = containerId;
+                    container.style.position = 'fixed';
+                    container.style.pointerEvents = 'none';
+                    container.style.top = '0';
+                    container.style.left = '0';
+                    container.style.width = '100%';
+                    container.style.height = '100%';
+                    container.style.zIndex = '2147483640';
+                    container.style.backgroundColor = 'transparent';
+                    document.body.appendChild(container);
+                }
                 for (let i = 0; i < arguments.length; i += 2) {
                     const element = arguments[i];
                     const index = arguments[i + 1];
-                    
-                    element.style.outline = '3px solid red';
-                    element.style.boxShadow = '0 0 10px 2px red';
-                    element.setAttribute('data-element-index', index.toString());
-                    
-                    // Add a number label overlay
+                    const color = colors[index % colors.length];
+                    const backgroundColor = color + '1A'; // 10% opacity
+                    const rects = element.getClientRects();
+                    if (!rects || rects.length === 0) continue;
+                    // Draw overlays for each rect
+                    for (const rect of rects) {
+                        if (rect.width === 0 || rect.height === 0) continue;
+                        const overlay = document.createElement('div');
+                        overlay.style.position = 'fixed';
+                        overlay.style.border = `2px solid ${color}`;
+                        overlay.style.backgroundColor = backgroundColor;
+                        overlay.style.pointerEvents = 'none';
+                        overlay.style.boxSizing = 'border-box';
+                        overlay.style.top = `${rect.top}px`;
+                        overlay.style.left = `${rect.left}px`;
+                        overlay.style.width = `${rect.width}px`;
+                        overlay.style.height = `${rect.height}px`;
+                        container.appendChild(overlay);
+                    }
+                    // Add a single label for the first rect
+                    const firstRect = rects[0];
                     const label = document.createElement('div');
-                    label.textContent = index.toString();
-                    label.style.position = 'absolute';
-                    label.style.top = '0';
-                    label.style.left = '0';
-                    label.style.backgroundColor = 'red';
+                    label.className = 'playwright-highlight-label';
+                    label.textContent = index;
+                    label.style.position = 'fixed';
+                    label.style.background = color;
                     label.style.color = 'white';
-                    label.style.fontSize = '12px';
+                    label.style.padding = '1px 4px';
+                    label.style.borderRadius = '4px';
+                    label.style.fontSize = `${Math.min(12, Math.max(8, firstRect.height / 2))}px`;
                     label.style.fontWeight = 'bold';
-                    label.style.padding = '2px 6px';
-                    label.style.zIndex = '10000';
-                    label.style.borderRadius = '3px';
-                    
-                    element.style.position = 'relative';
-                    element.appendChild(label);
+                    label.style.zIndex = '2147483647';
+                    // Position label at top-right of the first rect
+                    let labelTop = firstRect.top + 2;
+                    let labelLeft = firstRect.left + firstRect.width - 22;
+                    if (firstRect.width < 24 || firstRect.height < 16) {
+                        labelTop = firstRect.top - 16;
+                        labelLeft = firstRect.left + firstRect.width - 22;
+                        if (labelLeft < 0) labelLeft = firstRect.left;
+                    }
+                    label.style.top = `${Math.max(0, Math.min(labelTop, window.innerHeight - 16))}px`;
+                    label.style.left = `${Math.max(0, Math.min(labelLeft, window.innerWidth - 22))}px`;
+                    container.appendChild(label);
                 }
             "#;
 
             // Prepare arguments array
             let mut args = Vec::new();
-            for (element, index) in elements_to_highlight {
+            for (element, index) in &elements_to_highlight {
                 args.push(element.to_json()?);
                 args.push(serde_json::json!(index));
             }
@@ -510,15 +561,15 @@ Based on your role, goal, and the current task, determine the next action to tak
         }
 
         // Ensure the images directory exists
-        if let Some(parent) = Path::new(screenshot_path).parent() {
+        if let Some(parent) = std::path::Path::new(screenshot_path).parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent)?;
+                std::fs::create_dir_all(parent)?;
             }
         }
 
         // Take screenshot
         let png_data = self.driver.screenshot_as_png().await?;
-        fs::write(screenshot_path, &png_data)?;
+        std::fs::write(screenshot_path, &png_data)?;
         // convert to base64 for AI prompt
         let b64 = base64::encode(&png_data);
         Ok(b64)
